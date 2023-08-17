@@ -1,0 +1,10 @@
+version: "3.8"
+
+services:
+  pystudyhours:
+    container_name: pystudyhours
+    build: .
+    volumes:
+      - /etc/pystudyhours:/etc/pystudyhours
+    env_file:
+      - .env

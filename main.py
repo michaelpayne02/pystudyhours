@@ -4,9 +4,8 @@ Login to mygreekstudy.com and download the CSV data
 import sys
 import os
 import csv
-import requests
 from io import StringIO
-import itertools
+import requests
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -34,6 +33,20 @@ BASE_URL = "https://mygreekstudy.com"  # Replace with the actual base URL
 login_url = f"{BASE_URL}/login.php"
 csv_url = f"{BASE_URL}/current_report.php"
 
+login_data = {
+    "username": username,
+    "password": password,
+}
+
+csv_params = {
+    "reportType": "csv",
+    "org": org,
+    "school": school,
+    "userEmail": username,
+    "to": "",
+    "from": "",
+}
+
 # Create a session to persist cookies across requests
 session = requests.Session()
 
@@ -44,10 +57,7 @@ def get_csv_data() -> csv.reader:
         # Perform login and store cookies in the session
         response = session.post(
             login_url,
-            data={
-                "username": username,
-                "password": password,
-            },
+            data=login_data,
         )
 
         # Check if login was successful
@@ -59,16 +69,10 @@ def get_csv_data() -> csv.reader:
         # Get the CSV data
         csv_response = session.get(
             csv_url,
-            params={
-                "reportType": "csv",
-                "org": org,
-                "school": school,
-                "userEmail": username,
-                "to": "",
-                "from": "",
-            },
+            params=csv_params,
         )
 
+        # Check if export was successful
         if (
             csv_response.status_code == 200
             and csv_response.headers["Content-Type"] == "text/csv"
@@ -77,26 +81,27 @@ def get_csv_data() -> csv.reader:
         else:
             raise ValueError("CSV data retrieval failed.")
 
+        # Load and clean the CSV data
         csv_data = csv_response.content.decode("utf-8")
-
         csv_reader = csv.reader(StringIO(csv_data))
-
-        # trim all whitespace from the CSV data
         csv_clean = ([cell.strip() for cell in row] for row in csv_reader)
+
         return csv_clean
 
-    except ValueError:
+    except ValueError as err:
+        print(err)
         sys.exit(1)
 
 
 def main():
     """Shows basic usage of the Sheets API.
-    Prints values from a sample spreadsheet.
+    Replace spreadsheetId and range with values from csv
     """
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first
     # time.
+    os.chdir("/etc/pystudyhours")
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
     # If there are no (valid) credentials available, let the user log in.
@@ -117,6 +122,7 @@ def main():
         # Get the CSV data
         csv_data = get_csv_data()
 
+        # Update the spreadsheet
         result = (
             sheet.values()
             .update(
@@ -127,9 +133,12 @@ def main():
             )
             .execute()
         )
+
         print(f"Successfully updated {result.get('updatedCells')} cells.")
+
     except HttpError as err:
         print(err)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
