@@ -4,7 +4,13 @@ services:
   pystudyhours:
     container_name: pystudyhours
     build: .
+    restart: unless-stopped
     volumes:
-      - /etc/pystudyhours:/etc/pystudyhours
-    env_file:
-      - .env
+      - /etc/pystudyhours/key.json:/app/key.json
+    environment:
+      - GREEKSTUDY_USERNAME
+      - GREEKSTUDY_PASSWORD
+      - GREEKSTUDY_ORG
+      - GREEKSTUDY_SCHOOL
+      - GOOGLE_SHEET_ID
+      - GOOGLE_SHEET_RANGE

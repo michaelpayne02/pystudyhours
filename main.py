@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Login to mygreekstudy.com and download the CSV data
 """
@@ -7,9 +8,7 @@ import csv
 from io import StringIO
 import requests
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -81,7 +80,7 @@ def get_csv_data() -> csv.reader:
         else:
             raise ValueError("CSV data retrieval failed.")
 
-        # Load and clean the CSV data
+        # Decode and clean the CSV data
         csv_data = csv_response.content.decode("utf-8")
         csv_reader = csv.reader(StringIO(csv_data))
         csv_clean = ([cell.strip() for cell in row] for row in csv_reader)
@@ -97,23 +96,12 @@ def main():
     """Shows basic usage of the Sheets API.
     Replace spreadsheetId and range with values from csv
     """
-    creds = None
-    # The file token.json stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
-    os.chdir("/etc/pystudyhours")
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-    # If there are no (valid) credentials available, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
-            creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open("token.json", "w", encoding="utf-8") as token:
-            token.write(creds.to_json())
+    # The file key.json stores the service account private key
+    os.chdir("/app")
+    if os.path.exists("key.json"):
+        creds = Credentials.from_service_account_file("key.json", scopes=SCOPES)
+    else:
+        raise ValueError("No service account key found.")
 
     try:
         # pylint: disable=no-member
