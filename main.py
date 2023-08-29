@@ -2,12 +2,13 @@
 """
 Login to mygreekstudy.com and download the CSV data
 """
-import sys
-import os
 import csv
+import os
+import sys
+from datetime import datetime, timedelta
 from io import StringIO
-import requests
 
+import requests
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -37,13 +38,20 @@ login_data = {
     "password": password,
 }
 
+today = datetime.today()
+days_until_last_friday = (today.weekday() - 4) % 7
+days_until_next_thursday = (3 - today.weekday()) % 7
+
+last_friday = today - timedelta(days=days_until_last_friday)
+this_thursday = today + timedelta(days=days_until_next_thursday)
+
 csv_params = {
     "reportType": "csv",
     "org": org,
     "school": school,
     "userEmail": username,
-    "to": "",
-    "from": "",
+    "to": last_friday.strftime("%m/%d/%Y"),
+    "from": this_thursday.strftime("%m/%d/%Y"),
 }
 
 # Create a session to persist cookies across requests
