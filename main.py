@@ -39,10 +39,10 @@ login_data = {
 }
 
 today = datetime.today()
-days_until_last_friday = (today.weekday() - 4) % 7
+days_since_last_friday = (today.weekday() - 4) % 7
 days_until_next_thursday = (3 - today.weekday()) % 7
 
-last_friday = today - timedelta(days=days_until_last_friday)
+last_friday = today - timedelta(days=days_since_last_friday)
 this_thursday = today + timedelta(days=days_until_next_thursday)
 
 csv_params = {

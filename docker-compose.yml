@@ -14,3 +14,4 @@ services:
       - GREEKSTUDY_SCHOOL
       - GOOGLE_SHEET_ID
       - GOOGLE_SHEET_RANGE
+      - TZ=America/Chicago
