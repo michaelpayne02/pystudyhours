@@ -7,6 +7,10 @@ services:
     restart: unless-stopped
     volumes:
       - /etc/pystudyhours/key.json:/app/key.json
+      - type: tmpfs
+        target: /app/cookies
+        tmpfs:
+          size: 8192
     environment:
       - GREEKSTUDY_USERNAME
       - GREEKSTUDY_PASSWORD
