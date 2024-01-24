@@ -122,7 +122,7 @@ def main():
     if os.path.exists(KEY_PATH):
         creds = Credentials.from_service_account_file(KEY_PATH, scopes=SCOPES)
     else:
-        raise ValueError("No service account key found.")
+        raise ValueError("No service account key found")
 
     session = load_session()
     # Check if cookies are empty, if so login
@@ -133,6 +133,7 @@ def main():
     try:
         csv_data = get_csv_data(session)
     except ValueError:
+        print("CSV retrieval failed. Retrying login")
         login(session)
         csv_data = get_csv_data(session)
 
@@ -151,7 +152,7 @@ def main():
             .execute()
         )
 
-        print(f"Successfully updated {result.get('updatedCells')} cells.")
+        print(f"Successfully updated {result.get('updatedCells')} cells")
 
     except HttpError as err:
         print(err)
