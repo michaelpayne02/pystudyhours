@@ -15,7 +15,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 DATA_DIR = "/app"
-COOKIE_PATH = os.path.join(DATA_DIR, "cookies.pickle")
+COOKIE_PATH = os.path.join(DATA_DIR, "cookies", "cookies.pickle")
 KEY_PATH = os.path.join(DATA_DIR, "key.json")
 
 # Setup google api
