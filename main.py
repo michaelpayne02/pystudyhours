@@ -40,10 +40,20 @@ SCHOOL = os.environ.get("GREEKSTUDY_SCHOOL")
 
 
 # Create a session to persist cookies across requests
-session = requests.Session()
 
 
-def login():
+def load_session() -> requests.Session:
+    """Load the session from the cookie file"""
+    session = requests.Session()
+
+    if os.path.exists(COOKIE_PATH):
+        with open(COOKIE_PATH, "rb") as f:
+            session.cookies.update(pickle.load(f))
+
+    return session
+
+
+def login(session: requests.Session):
     """Perform login and store cookies in the session"""
 
     response = session.post(
@@ -63,16 +73,11 @@ def login():
     # Save the cookies to a file
     with open(COOKIE_PATH, "wb") as f:
         pickle.dump(session.cookies, f)
+        print("Login successfully saved")
 
 
-def get_csv_data() -> list[list[str]]:
+def get_csv_data(session: requests.Session) -> list[list[str]]:
     """Get the CSV data from mygreekstudy.com"""
-    if os.path.exists(COOKIE_PATH):
-        with open(COOKIE_PATH, "rb") as f:
-            session.cookies.update(pickle.load(f))
-
-    else:
-        login()
 
     today = datetime.today()
     days_since_last_fri = (today.weekday() - 4) % 7
@@ -100,7 +105,7 @@ def get_csv_data() -> list[list[str]]:
     ):
         print("CSV data retrieved")
     else:
-        raise ValueError("CSV data retrieval failed.")
+        raise ValueError("CSV export failed")
 
     # Decode and clean the CSV data
     csv_data = csv_response.content.decode("utf-8")
@@ -119,6 +124,18 @@ def main():
     else:
         raise ValueError("No service account key found.")
 
+    session = load_session()
+    # Check if cookies are empty, if so login
+    if not session.cookies:
+        login(session)
+
+    # For the case when the cookies are invalid, meanning the session has expired
+    try:
+        csv_data = get_csv_data(session)
+    except ValueError:
+        login(session)
+        csv_data = get_csv_data(session)
+
     try:
         sheet = build("sheets", "v4", credentials=creds).spreadsheets()
 
@@ -129,7 +146,7 @@ def main():
                 spreadsheetId=SPREADSHEET_ID,
                 range=RANGE_NAME,
                 valueInputOption="USER_ENTERED",
-                body={"values": get_csv_data()},
+                body={"values": csv_data},
             )
             .execute()
         )
