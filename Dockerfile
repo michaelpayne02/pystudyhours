@@ -7,7 +7,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY main.py /etc/periodic/hourly/main.py
-RUN chmod +x /etc/periodic/hourly/main.py
+COPY main.py /etc/periodic/hourly/pystudyhours.py
+RUN chmod +x /etc/periodic/hourly/pystudyhours.py
 
 CMD ["crond", "-f", "-d", "8"]

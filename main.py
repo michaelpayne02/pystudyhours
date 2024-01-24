@@ -4,6 +4,7 @@ Login to mygreekstudy.com and download the CSV data
 """
 import csv
 import os
+import pickle
 import sys
 from datetime import datetime, timedelta
 from io import StringIO
@@ -13,119 +14,122 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-# Define the login credentials
-username = os.environ.get("GREEKSTUDY_USERNAME")
-password = os.environ.get("GREEKSTUDY_PASSWORD")
-
-org = os.environ.get("GREEKSTUDY_ORG")
-school = os.environ.get("GREEKSTUDY_SCHOOL")
+DATA_DIR = "/app"
+COOKIE_PATH = os.path.join(DATA_DIR, "cookies.pickle")
+KEY_PATH = os.path.join(DATA_DIR, "key.json")
 
 # Setup google api
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-# The ID and range of a sample spreadsheet.
-spreadsheet_id = os.environ.get("GOOGLE_SHEET_ID")
-range_name = os.environ.get("GOOGLE_SHEET_RANGE")
+# The ID and range of a any spreadsheet.
+SPREADSHEET_ID = os.environ.get("GOOGLE_SHEET_ID")
+RANGE_NAME = os.environ.get("GOOGLE_SHEET_RANGE")
 
 # Define the URLs
-BASE_URL = "https://mygreekstudy.com"  # Replace with the actual base URL
-login_url = f"{BASE_URL}/login.php"
-csv_url = f"{BASE_URL}/current_report.php"
+BASE_URL = "https://mygreekstudy.com"
+LOGIN_URL = f"{BASE_URL}/login.php"
+CSV_URL = f"{BASE_URL}/current_report.php"
 
-login_data = {
-    "username": username,
-    "password": password,
-}
+# Define the login credentials
+USERNAME = os.environ.get("GREEKSTUDY_USERNAME")
+PASSWORD = os.environ.get("GREEKSTUDY_PASSWORD")
 
-today = datetime.today()
-days_since_last_friday = (today.weekday() - 4) % 7
-days_until_next_thursday = (3 - today.weekday()) % 7
+ORGANIZATION = os.environ.get("GREEKSTUDY_ORG")
+SCHOOL = os.environ.get("GREEKSTUDY_SCHOOL")
 
-last_friday = today - timedelta(days=days_since_last_friday)
-this_thursday = today + timedelta(days=days_until_next_thursday)
-
-csv_params = {
-    "reportType": "csv",
-    "org": org,
-    "school": school,
-    "userEmail": username,
-    "to": last_friday.strftime("%m/%d/%Y"),
-    "from": this_thursday.strftime("%m/%d/%Y"),
-}
 
 # Create a session to persist cookies across requests
 session = requests.Session()
 
 
-def get_csv_data() -> csv.reader:
+def login():
+    """Perform login and store cookies in the session"""
+
+    response = session.post(
+        LOGIN_URL,
+        data={
+            "username": USERNAME,
+            "password": PASSWORD,
+        },
+    )
+
+    # Check if login was successful
+    if response.status_code == 200:
+        print("Login successful")
+    else:
+        raise ValueError("Login failed: Invalid username or password")
+
+    # Save the cookies to a file
+    with open(COOKIE_PATH, "wb") as f:
+        pickle.dump(session.cookies, f)
+
+
+def get_csv_data() -> list[list[str]]:
     """Get the CSV data from mygreekstudy.com"""
-    try:
-        # Perform login and store cookies in the session
-        response = session.post(
-            login_url,
-            data=login_data,
-        )
+    if os.path.exists(COOKIE_PATH):
+        with open(COOKIE_PATH, "rb") as f:
+            session.cookies.update(pickle.load(f))
 
-        # Check if login was successful
-        if response.status_code == 200:
-            print("Login successful")
-        else:
-            raise ValueError("Login failed: Invalid username or password")
+    else:
+        login()
 
-        # Get the CSV data
-        csv_response = session.get(
-            csv_url,
-            params=csv_params,
-        )
+    today = datetime.today()
+    days_since_last_fri = (today.weekday() - 4) % 7
+    days_until_next_thurs = (3 - today.weekday()) % 7
 
-        # Check if export was successful
-        if (
-            csv_response.status_code == 200
-            and csv_response.headers["Content-Type"] == "text/csv"
-        ):
-            print("CSV data retrieved")
-        else:
-            raise ValueError("CSV data retrieval failed.")
+    last_fri = (today - timedelta(days=days_since_last_fri)).strftime("%m/%d/%Y")
+    this_thurs = (today + timedelta(days=days_until_next_thurs)).strftime("%m/%d/%Y")
 
-        # Decode and clean the CSV data
-        csv_data = csv_response.content.decode("utf-8")
-        csv_reader = csv.reader(StringIO(csv_data))
-        csv_clean = ([cell.strip() for cell in row] for row in csv_reader)
+    csv_response = session.get(
+        CSV_URL,
+        params={
+            "reportType": "csv",
+            "org": ORGANIZATION,
+            "school": SCHOOL,
+            "userEmail": USERNAME,
+            "to": last_fri,
+            "from": this_thurs,
+        },
+    )
 
-        return csv_clean
+    # Check if export was successful
+    if (
+        csv_response.status_code == 200
+        and csv_response.headers["Content-Type"] == "text/csv"
+    ):
+        print("CSV data retrieved")
+    else:
+        raise ValueError("CSV data retrieval failed.")
 
-    except ValueError as err:
-        print(err)
-        sys.exit(1)
+    # Decode and clean the CSV data
+    csv_data = csv_response.content.decode("utf-8")
+    csv_reader = csv.reader(StringIO(csv_data))
+    csv_clean = ([cell.strip() for cell in row] for row in csv_reader)
+
+    return list(csv_clean)
 
 
 def main():
-    """Shows basic usage of the Sheets API.
-    Replace spreadsheetId and range with values from csv
-    """
+    """Pulls CSV data from mygreekstudy.com and updates a google sheet"""
+
     # The file key.json stores the service account private key
-    os.chdir("/app")
-    if os.path.exists("key.json"):
-        creds = Credentials.from_service_account_file("key.json", scopes=SCOPES)
+    if os.path.exists(KEY_PATH):
+        creds = Credentials.from_service_account_file(KEY_PATH, scopes=SCOPES)
     else:
         raise ValueError("No service account key found.")
 
     try:
-        # pylint: disable=no-member
         sheet = build("sheets", "v4", credentials=creds).spreadsheets()
-
-        # Get the CSV data
-        csv_data = get_csv_data()
 
         # Update the spreadsheet
         result = (
             sheet.values()
             .update(
-                spreadsheetId=spreadsheet_id,
-                range=range_name,
+                spreadsheetId=SPREADSHEET_ID,
+                range=RANGE_NAME,
                 valueInputOption="USER_ENTERED",
-                body={"values": list(csv_data)},
+                body={"values": get_csv_data()},
             )
             .execute()
         )
@@ -133,6 +137,9 @@ def main():
         print(f"Successfully updated {result.get('updatedCells')} cells.")
 
     except HttpError as err:
+        print(err)
+        sys.exit(1)
+    except ValueError as err:
         print(err)
         sys.exit(1)
 
