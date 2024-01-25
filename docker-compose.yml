@@ -10,7 +10,7 @@ services:
       - type: tmpfs
         target: /app/cookies
         tmpfs:
-          size: 8192
+          size: 2048
     environment:
       - GREEKSTUDY_USERNAME
       - GREEKSTUDY_PASSWORD
